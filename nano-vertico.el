@@ -235,7 +235,7 @@
   
   (setq mode-line-format
         `(:eval (let* ((help "C-g to cancel")
-                       (minibuffer "") ;; (format " Minibuffer #%d" (minibuffer-depth)))
+                       (minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
                        (prompt (concat " "(string-trim (minibuffer-prompt) nil "[: ]+")))
                        (left (if (eq nano-vertico-prompt nil)
                                  ""
