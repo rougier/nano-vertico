@@ -114,7 +114,7 @@
   (if (eq (string-match content completion) 0)
     (let ((completion (substring-no-properties completion
                        (length content) (length completion))))
-      (concat (propertize content 'face 'nano-vertico-header-face)
+      (concat (propertize content 'face '(nano-vertico-header-face bold))
               (propertize completion 'face 'font-lock-comment-face)))
     content))
 
@@ -212,7 +212,6 @@
       `(:filtered (:window mini-window nil) nano-vertico-mode-line-face))
   ;; (face-remap-add-relative 'fringe
   ;;    `(:filtered (:window mini-window nil) (:background "black")))
-
   (face-remap-set-base 'header-line 'nano-vertico-header-face)
   (setq-local cursor-type nil)
 
