@@ -50,9 +50,12 @@
   :type '(cons float float)
   :group 'nano-vertico)
 
-(defcustom nano-vertico-prompt "$"
-  "Prompt replacement (can be nil)"
-  :type 'string
+(defcustom nano-vertico-prompt t
+  "Prompt replacement that can be nil (regular prompt), t (minibuffer
+ depth) or an arbitrary prompt string"
+  :type '(choice (const :tag "Regular prompt" nil)
+                 (const :tag "Minibuffer counter" t)
+                 (string :tag "User defined"))
   :group 'nano-vertico)
 
 (defface nano-vertico-header-face
@@ -145,8 +148,9 @@
                     (if (boundp 'nano-modeline-padding)
                         (propertize " " 'display `(raise ,top))
                       "")
-                    (or nano-vertico-prompt
-                       (string-trim prompt nil "[: ]+"))
+                    (cond ((eq nano-vertico-prompt t) (format "#%d" (minibuffer-depth)))
+                          ((stringp nano-vertico-prompt) nano-vertico-prompt)
+                          (t (string-trim prompt nil "[: ]+")))
                     (if (boundp 'nano-modeline-padding)
                         (propertize " " 'display `(raise ,(- bottom)))
                       "")))
@@ -231,9 +235,11 @@
   
   (setq mode-line-format
         `(:eval (let* ((help "C-g to cancel")
-                       (minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
+                       (minibuffer "") ;; (format " Minibuffer #%d" (minibuffer-depth)))
                        (prompt (concat " "(string-trim (minibuffer-prompt) nil "[: ]+")))
-                       (left (if nano-vertico-prompt prompt ""))
+                       (left (if (eq nano-vertico-prompt nil)
+                                 ""
+                               prompt))
                        (right minibuffer))
                   (concat
                    (propertize left 'face '(mode-line bold))
