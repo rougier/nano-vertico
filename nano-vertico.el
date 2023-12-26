@@ -32,8 +32,8 @@
 ;;
 ;; Known problems:
 ;; - Messages are hidden when prompt is active
-;; - Opening two minibuffers in two different frame at the same time
-;;   messes up with depth
+;; - Opening two minibuffers in two different frames at the same time
+;;   messes up depth detection.
 ;;
 
 ;;; NEWS:
