@@ -118,7 +118,7 @@
               (propertize completion 'face 'font-lock-comment-face)))
     content))
 
-(defun nano-vertico--header-line ()
+(defun nano-vertico--update-header-line ()
   "This function do several things:
 1. Copy the minibuffer prompt and contents to header line
 2. Emulate cursor inside the header line
@@ -137,7 +137,8 @@
                          prompt
                      " "))
            (prompt-length (+ 2 (length prompt)))
-           (items (format "%d items" vertico--total))
+           (items (or nano-vertico--current-message
+                      (format "%d items" vertico--total)))
            (candidate (or (vertico--candidate) ""))
            (contents (nano-vertico--format-content contents candidate))
            (point (1+ (point)))
@@ -241,7 +242,7 @@
   (add-hook 'minibuffer-exit-hook #'nano-vertico--exit)
 
   ;; Install our copy function
-  (add-hook 'post-command-hook #'nano-vertico--header-line))
+  (add-hook 'post-command-hook #'nano-vertico--update-header-line))
 
 
 (defun nano-vertico--exit ()
@@ -250,7 +251,7 @@
   (unless (> (minibuffer-depth) 1)
     (with-current-buffer (car nano-vertico--saved-state)
       (setq mode-line-format (cdr nano-vertico--saved-state)))
-    (remove-hook 'post-command-hook #'nano-vertico--header-line)))
+    (remove-hook 'post-command-hook #'nano-vertico--update-header-line)))
 
 (defun nano-vertico--format-string (string)
   "Return STRING with height property set to default height"
@@ -272,6 +273,20 @@ default face height is set to 0.1 to hide regular prompt/contents"
                     (nano-vertico--format-string suffix)
                     index start))))
 
+(defvar nano-vertico--current-message nil
+  "Current minibuffer message")
+
+(defun nano-vertico--minibuffer-message (orig-fun message &rest args)
+  "Copy message to nano-vertico--current-message, wait for timeout
+and delete it"
+  
+  (setq nano-vertico--current-message (apply #'format-message message args))
+  (nano-vertico--update-header-line)
+  (apply orig-fun message args)
+  
+  (sit-for (or minibuffer-message-timeout 1000000))
+  (setq nano-vertico--current-message nil)
+  (nano-vertico--update-header-line))
 
 (defun nano-vertico-mode-on ()
   "Activate nano-vertico-mode"
@@ -293,6 +308,10 @@ default face height is set to 0.1 to hide regular prompt/contents"
   (advice-add #'vertico--format-candidate
            :around #'nano-vertico--format-candidate)
 
+  ;; Install advice on minibuffer message
+  (advice-add #'minibuffer-message
+              :around #'nano-vertico--minibuffer-message)
+  
   ;; Starts vertico buffer mode
   (vertico-buffer-mode 1))
 
@@ -307,10 +326,14 @@ default face height is set to 0.1 to hide regular prompt/contents"
   (advice-remove #'vertico--setup
                  #'nano-vertico--setup)
 
-    ;; Install our own format
+  ;; Remove our formatting
   (advice-remove #'vertico--format-candidate
                  #'nano-vertico--format-candidate)
 
+  ;; Remove our message handler
+  (advice-add #'minibuffer-message
+              :around #'nano-vertico--minibuffer-message)
+  
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
 
