@@ -1,0 +1,19 @@
+* N Λ N O vertico
+
+nano-vertico takes advantage of [[https://github.com/minad/vertico][vertico-buffer]] mode to display the
+minibuffer prompt and contents inside the header line while
+completions are displayed in a regular buffer. Prompt can be changed and displayed in the modeline.
+
+*Note*: nano-vertico is highly experimental and may not be safe for daily use
+
+** Usage
+
+#+begin_src emacs-lisp
+(require 'nano-vertico)
+(nano-vertico-mode 1)
+#+end_src
+
+** Screenshot
+
+[[file:nano-vertico.png]]
+
