@@ -95,7 +95,7 @@
   "Face for active region"
     :group 'nano-vertico)
 
-(defface nano-vertico-help-face
+(defface nano-vertico-annotation-face
   `((t :foreground ,(face-foreground font-lock-comment-face nil t)
        :box (:line-width 1 :color ,(face-foreground 'default) :style nil)))
   "Face for help message"
@@ -129,8 +129,7 @@
 ;;  (let ((active (eq (window-buffer (active-minibuffer-window))
 ;;                    (current-buffer))))
 ;;    (with-current-buffer (window-buffer (active-minibuffer-window))
-  (let ((active (eq (window-buffer (minibuffer-window))
-                    (current-buffer))))
+  (let ((active (eq (window-buffer (minibuffer-window)) (current-buffer))))
     (with-current-buffer (window-buffer (minibuffer-window))
       (let* ((prompt (substring-no-properties (minibuffer-prompt)))
              (contents (substring-no-properties (minibuffer-contents)))
@@ -138,29 +137,23 @@
                          prompt
                      " "))
            (prompt-length (+ 2 (length prompt)))
-           (help (format "%d items" vertico--total))
+           (items (format "%d items" vertico--total))
            (candidate (or (vertico--candidate) ""))
            (contents (nano-vertico--format-content contents candidate))
            (point (1+ (point)))
            (top (car nano-vertico-header-padding))
            (bottom (cdr nano-vertico-header-padding))
            (prompt (concat
-                    (if (boundp 'nano-modeline-padding)
-                        (propertize " " 'display `(raise ,top))
-                      "")
+                    (propertize " " 'display `(raise ,top))
                     (cond ((eq nano-vertico-prompt t) (format "#%d" (minibuffer-depth)))
                           ((stringp nano-vertico-prompt) nano-vertico-prompt)
                           (t (string-trim prompt nil "[: ]+")))
-                    (if (boundp 'nano-modeline-padding)
-                        (propertize " " 'display `(raise ,(- bottom)))
-                      "")))
-           (prompt (concat (propertize prompt 'face 'nano-vertico-prompt-face)
-                           " "))
+                    (propertize " " 'display `(raise ,(- bottom)))))
+           (prompt (concat (propertize prompt 'face 'nano-vertico-prompt-face) " "))
            (contents (concat contents
                              " "
-                             (propertize " "
-                                         'display `(space :align-to (- right ,(length help) 1)))
-                             (propertize help 'face 'nano-vertico-help-face))))
+                             (propertize " " 'display `(space :align-to (- right ,(length items) 1)))
+                             (propertize items 'face 'nano-vertico-annotation-face))))
 
     ;; Hide regular prompt & contents 
     (unless (or cursor-type (not header-line-format))
@@ -194,7 +187,6 @@
         (setq contents
               (concat (substring contents 0 (- (window-width) prompt-length space))
                       (if (not end-of-line) "…")))))
-
     (setq-local header-line-format (concat prompt contents))))))
 
 
