@@ -225,15 +225,14 @@
       (setq mode-line-format nil)))
   
   (setq mode-line-format
-        `(:eval (let* ((help "C-g to cancel")
-                       (minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
-                       (prompt (concat " "(string-trim (minibuffer-prompt) nil "[: ]+")))
+        `(:eval (let* ((minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
+                       (prompt (format " %s" (string-trim (minibuffer-prompt) nil "[: ]+")))
                        (left (if (eq nano-vertico-prompt nil)
                                  ""
                                prompt))
                        (right minibuffer))
                   (concat
-                   (propertize left 'face '(mode-line bold))
+                   (propertize left 'face '(bold mode-line))
                    (propertize " "
                                'display `(space :align-to (- right ,(length right) 1)))
                    (propertize right 'face '(font-lock-comment-face mode-line))))))
