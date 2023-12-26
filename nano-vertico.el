@@ -282,8 +282,8 @@ and delete it"
   
   (setq nano-vertico--current-message (apply #'format-message message args))
   (nano-vertico--update-header-line)
-  (apply orig-fun message args)
-  
+  (let ((inhibit-message t))
+    (message message args))
   (sit-for (or minibuffer-message-timeout 1000000))
   (setq nano-vertico--current-message nil)
   (nano-vertico--update-header-line))
@@ -333,6 +333,7 @@ and delete it"
   ;; Remove our message handler
   (advice-add #'minibuffer-message
               :around #'nano-vertico--minibuffer-message)
+  (setq nano-vertico--current-message nil)
   
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
