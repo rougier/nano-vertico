@@ -31,7 +31,7 @@
 ;;  experimental and may not be safe for daily use.
 ;;
 ;; Known problems:
-;; - Messages are hidden when prompt is active
+;; - FIXED. Messages are hidden when prompt is active
 ;; - Opening two minibuffers in two different frames at the same time
 ;;   messes up depth detection.
 ;;
@@ -188,6 +188,7 @@
         (setq contents
               (concat (substring contents 0 (- (window-width) prompt-length space))
                       (if (not end-of-line) "…")))))
+    
     (setq-local header-line-format (concat prompt contents))))))
 
 
