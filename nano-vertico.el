@@ -70,13 +70,12 @@
   `((t :foreground ,(face-foreground 'default)
        :height ,(face-attribute 'default :height)
        :box nil
-       :overline ,(face-foreground 'default)))
+       :overline ,(face-foreground 'font-lock-comment-face nil t)))
   "Face for mode line"
   :group 'nano-vertico)
 
 (defface nano-vertico-buffer-face
   `((t :foreground ,(face-foreground 'default)
-       ;; :background ,(face-background 'default)
        :height 0.1))
   "Face for completions"
   :group 'nano-vertico)
@@ -97,7 +96,8 @@
 
 (defface nano-vertico-annotation-face
   `((t :foreground ,(face-foreground font-lock-comment-face nil t)
-       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)))
+       ;; :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
+       ))
   "Face for help message"
     :group 'nano-vertico)
 
