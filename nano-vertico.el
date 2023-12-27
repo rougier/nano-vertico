@@ -195,18 +195,15 @@
 (defun nano-vertico--setup ()
   "Setup nano vertico mode"
 
+  (face-remap-set-base 'header-line 'nano-vertico-header-face)
+  (face-remap-set-base 'mode-line 'nano-vertico-mode-line-face)
+  (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
+
   (dolist (win (get-buffer-window-list))
     (set-window-parameter win 'mini-window (window-minibuffer-p win)))
-  
   (face-remap-add-relative 'default
-      `(:filtered (:window mini-window nil) nano-vertico-buffer-face))
-  (face-remap-add-relative 'mode-line
-      `(:filtered (:window mini-window nil) nano-vertico-mode-line-face))
-  (face-remap-add-relative 'mode-line-inactive 
-      `(:filtered (:window mini-window nil) nano-vertico-mode-line-face))
-  ;; (face-remap-add-relative 'fringe
-  ;;    `(:filtered (:window mini-window nil) (:background "black")))
-  (face-remap-set-base 'header-line 'nano-vertico-header-face)
+       `(:filtered (:window mini-window nil) nano-vertico-buffer-face))
+ 
   (setq-local cursor-type nil)
 
   (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
