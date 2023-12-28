@@ -75,8 +75,7 @@
   :group 'nano-vertico)
 
 (defface nano-vertico-buffer-face
-  `((t :foreground ,(face-foreground 'default)
-       :height 0.1))
+  `((t :foreground ,(face-foreground 'default)))
   "Face for completions"
   :group 'nano-vertico)
 
@@ -126,9 +125,6 @@
 4. Hide the actual minibuffer prompt and contents
     (setting foreground color to background color)"
 
-;;  (let ((active (eq (window-buffer (active-minibuffer-window))
-;;                    (current-buffer))))
-;;    (with-current-buffer (window-buffer (active-minibuffer-window))
   (let ((active (eq (window-buffer (minibuffer-window)) (current-buffer))))
     (with-current-buffer (window-buffer (minibuffer-window))
       (let* ((actual-prompt (substring-no-properties (minibuffer-prompt)))
@@ -202,23 +198,13 @@
   (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
   (face-remap-set-base 'region 'default)
   
-  (dolist (win (get-buffer-window-list))
-    (set-window-parameter win 'mini-window (window-minibuffer-p win)))
-  (face-remap-add-relative 'default
-       `(:filtered (:window mini-window nil) nano-vertico-buffer-face))
-
   ;; Need to expand minibuffer by one line because of header padding (I think)
   (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
     (dolist (window windows)
       (unless (eq window (active-minibuffer-window))
-        (window-resize window 1 nil nil nil))))
+        (window-resize window 2))))
   
   (setq-local cursor-type nil)
-
-  (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
-    (dolist (window windows)
-      (unless (eq window (minibuffer-window))
-        (set-window-fringes window 1 1))))
 
   (when (eq (minibuffer-depth) 1)
     ;; We save mode line format since we hide it when minibuffer is displayed
@@ -260,26 +246,6 @@
       (setq mode-line-format (cdr nano-vertico--saved-state)))
     (remove-hook 'post-command-hook #'nano-vertico--update-header-line)))
 
-(defun nano-vertico--format-string (string)
-  "Return STRING with height property set to default height"
-  
-  (let ((height (face-attribute 'default ':height)))
-    (add-face-text-property  0 (length string) `(:height ,height) nil string)
-    string))
-
-(defun nano-vertico--format-candidate (orig cand prefix suffix index start)
-  "Make sure CAND, PREFIX and SUFFIX have height set because the
-default face height is set to 0.1 to hide regular prompt/contents"
-  
-  (let ((prefix (if (= vertico--index index) " " "  ")))
-    (if vertico-grid-mode
-        ;; Non brekable space or they are stripped
-        (funcall orig (nano-vertico--format-string cand) " " " " index start)
-      (funcall orig (nano-vertico--format-string cand)
-                    (nano-vertico--format-string prefix)
-                    (nano-vertico--format-string suffix)
-                    index start))))
-
 (defvar nano-vertico--current-message nil
   "Current minibuffer message")
 
@@ -314,10 +280,6 @@ and delete it"
   (advice-add #'vertico--setup
               :after #'nano-vertico--setup)
 
-  ;; Install our own cancidate format
-  (advice-add #'vertico--format-candidate
-           :around #'nano-vertico--format-candidate)
-
   ;; Install advice on minibuffer message
   (advice-add #'minibuffer-message
               :around #'nano-vertico--minibuffer-message)
@@ -340,10 +302,6 @@ and delete it"
   (advice-remove #'minibuffer-message
                  #'nano-vertico--minibuffer-message)
 
-  ;; Remove our formatting
-  (advice-remove #'vertico--format-candidate
-                 #'nano-vertico--format-candidate)
-  
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
 
