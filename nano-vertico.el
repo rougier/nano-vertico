@@ -204,7 +204,13 @@
     (set-window-parameter win 'mini-window (window-minibuffer-p win)))
   (face-remap-add-relative 'default
        `(:filtered (:window mini-window nil) nano-vertico-buffer-face))
- 
+
+  ;; Need to expand minibuffer by one line because of header padding (I think)
+  (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
+    (dolist (window windows)
+      (unless (eq window (active-minibuffer-window))
+        (window-resize window 1 nil nil nil))))
+  
   (setq-local cursor-type nil)
 
   (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
