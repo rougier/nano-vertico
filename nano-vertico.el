@@ -131,30 +131,31 @@
 ;;    (with-current-buffer (window-buffer (active-minibuffer-window))
   (let ((active (eq (window-buffer (minibuffer-window)) (current-buffer))))
     (with-current-buffer (window-buffer (minibuffer-window))
-      (let* ((prompt (substring-no-properties (minibuffer-prompt)))
+      (let* ((actual-prompt (substring-no-properties (minibuffer-prompt)))
              (contents (substring-no-properties (minibuffer-contents)))
-             (prompt (if (and (stringp prompt) (> (length prompt) 0))
-                         prompt
-                     " "))
-           (prompt-length (+ 2 (length prompt)))
-           (items (or nano-vertico--current-message
-                      (format "%d items" vertico--total)))
-           (candidate (or (vertico--candidate) ""))
-           (contents (nano-vertico--format-content contents candidate))
-           (point (1+ (point)))
-           (top (car nano-vertico-header-padding))
-           (bottom (cdr nano-vertico-header-padding))
-           (prompt (concat
-                    (propertize " " 'display `(raise ,top))
-                    (cond ((eq nano-vertico-prompt t) (format "#%d" (minibuffer-depth)))
-                          ((stringp nano-vertico-prompt) nano-vertico-prompt)
-                          (t (string-trim prompt nil "[: ]+")))
-                    (propertize " " 'display `(raise ,(- bottom)))))
-           (prompt (concat (propertize prompt 'face 'nano-vertico-prompt-face) " "))
-           (contents (concat contents
-                             " "
-                             (propertize " " 'display `(space :align-to (- right ,(length items) 1)))
-                             (propertize items 'face 'nano-vertico-annotation-face))))
+             (actual-prompt-length (+ 2 (length actual-prompt)))
+             (header-prompt (if (and (stringp actual-prompt) (> (length actual-prompt) 0))
+                                (cond ((eq nano-vertico-prompt t) (format "#%d" (minibuffer-depth)))
+                                      ((stringp nano-vertico-prompt) nano-vertico-prompt)
+                                      (t (string-trim prompt nil "[: ]+")))
+                              " "))
+             (items (or nano-vertico--current-message
+                        (format "%d items" vertico--total)))
+             (candidate (or (vertico--candidate) ""))
+             (contents (nano-vertico--format-content contents candidate))
+             (point (1+ (point)))
+             (top (car nano-vertico-header-padding))
+             (bottom (cdr nano-vertico-header-padding))
+             (header-prompt (concat
+                             (propertize " " 'display `(raise ,top))
+                             header-prompt
+                             (propertize " " 'display `(raise ,(- bottom)))))
+             (header-prompt-length (+ 2 (length header-prompt)))
+             (header-prompt (concat (propertize header-prompt 'face 'nano-vertico-prompt-face) " "))
+             (contents (concat contents
+                               " "
+                               (propertize " " 'display `(space :align-to (- right ,(length items) 1)))
+                               (propertize items 'face 'nano-vertico-annotation-face))))
 
     ;; Hide regular prompt & contents 
     (unless (or cursor-type (not header-line-format))
@@ -165,10 +166,10 @@
                               `(face (:foreground ,(face-background 'default))))))
 
     ;; Set cursor & region
-    (let ((cursor-pos (max 0 (- point prompt-length)))
+    (let ((cursor-pos (max 0 (- point actual-prompt-length)))
           (region (when (use-region-p)
                     (cons (- (region-beginning) -1 prompt-length)
-                          (- (region-end) prompt-length -1))))
+                          (- (region-end) actual-prompt-length -1))))
           (space 2)
           (end-of-line (= (point) (line-end-position))))
       ;; Set region
@@ -181,15 +182,15 @@
                                 'nano-vertico-cursor-face nil contents))
 
       ;; Make sure cursor is always visible
-      (when (> cursor-pos (- (window-width) prompt-length space))
+      (when (> cursor-pos (- (window-width) header-prompt-length space))
         (setq contents
-              (concat "…" (substring contents (- cursor-pos (- (window-width) prompt-length 2 space))))))
-      (when (> (length contents) (- (window-width) (length prompt) (- space 1)))
+              (concat "…" (substring contents (- cursor-pos (- (window-width) header-prompt-length 2 space))))))
+      (when (> (length contents) (- (window-width) header-prompt-length (- space 1)))
         (setq contents
-              (concat (substring contents 0 (- (window-width) prompt-length space))
+              (concat (substring contents 0 (- (window-width) header-prompt-length space))
                       (if (not end-of-line) "…")))))
     
-    (setq-local header-line-format (concat prompt contents))))))
+    (setq-local header-line-format (concat header-prompt contents))))))
 
 
 (defun nano-vertico--setup ()
