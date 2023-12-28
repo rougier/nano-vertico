@@ -131,7 +131,7 @@
 default face height is set to 0.1 to hide regular prompt/contents"
 
   (apply orig-fun (list (nano-vertico--format-string cand)
-                        (nano-vertico--format-string (concat " " prefix))
+                        (nano-vertico--format-string (concat " " prefix))
                         (nano-vertico--format-string suffix)
                         index start)))
 
@@ -295,7 +295,7 @@ and delete it"
         `(display-buffer-in-side-window
           (window-height . ,(+ 3 vertico-count))
           (side . bottom)))
-  (setq vertico-buffer-hide-prompt nil)
+  (setq vertico-buffer-hide-prompt t)
   
   ;; Install our setup after vertico setup
   (advice-add #'vertico--setup
