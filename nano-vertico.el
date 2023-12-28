@@ -168,10 +168,11 @@
     ;; Set cursor & region
     (let ((cursor-pos (max 0 (- point actual-prompt-length)))
           (region (when (use-region-p)
-                    (cons (- (region-beginning) -1 prompt-length)
+                    (cons (- (region-beginning) -1 actual-prompt-length)
                           (- (region-end) actual-prompt-length -1))))
           (space 2)
           (end-of-line (= (point) (line-end-position))))
+
       ;; Set region
       (when region 
         (add-face-text-property (car region) (cdr region)
@@ -199,7 +200,8 @@
   (face-remap-set-base 'header-line 'nano-vertico-header-face)
   (face-remap-set-base 'mode-line 'nano-vertico-mode-line-face)
   (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
-
+  (face-remap-set-base 'region 'default)
+  
   (dolist (win (get-buffer-window-list))
     (set-window-parameter win 'mini-window (window-minibuffer-p win)))
   (face-remap-add-relative 'default
