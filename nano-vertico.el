@@ -284,14 +284,17 @@ default face height is set to 0.1 to hide regular prompt/contents"
 (defun nano-vertico--minibuffer-message (orig-fun message &rest args)
   "Copy message to nano-vertico--current-message, wait for timeout
 and delete it"
-  
-  (setq nano-vertico--current-message (apply #'format-message message args))
-  (nano-vertico--update-header-line)
-  (let ((inhibit-message t))
-    (message message args))
-  (sit-for (or minibuffer-message-timeout 1000000))
-  (setq nano-vertico--current-message nil)
-  (nano-vertico--update-header-line))
+
+  (if (active-minibuffer-window)
+      (progn
+        (setq nano-vertico--current-message (apply #'format-message message args))
+        (nano-vertico--update-header-line)
+        (let ((inhibit-message t))
+          (message message args))
+        (sit-for (or minibuffer-message-timeout 1000000))
+        (setq nano-vertico--current-message nil)
+        (nano-vertico--update-header-line))
+    (apply orig-fun message args)))
 
 (defun nano-vertico-mode-on ()
   "Activate nano-vertico-mode"
@@ -331,14 +334,13 @@ and delete it"
   (advice-remove #'vertico--setup
                  #'nano-vertico--setup)
 
+  ;; Remove our advice on minibuffer message
+  (advice-remove #'minibuffer-message
+                 #'nano-vertico--minibuffer-message)
+
   ;; Remove our formatting
   (advice-remove #'vertico--format-candidate
                  #'nano-vertico--format-candidate)
-
-  ;; Remove our message handler
-  (advice-add #'minibuffer-message
-              :around #'nano-vertico--minibuffer-message)
-  (setq nano-vertico--current-message nil)
   
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
