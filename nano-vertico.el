@@ -234,6 +234,7 @@ default face height is set to 0.1 to hide regular prompt/contents"
     (dolist (window windows)
       (unless (eq window (active-minibuffer-window))
         (set-window-margins window 0 0)
+        (set-window-fringes window 1 1)
         (window-resize window 1))))
   
   (setq-local cursor-type nil)
