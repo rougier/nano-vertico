@@ -207,6 +207,18 @@ default face height is set to 0.1 to hide regular prompt/contents"
     
     (setq-local header-line-format (concat header-prompt contents))))))
 
+(defun nano-vertico--mode-line ()
+  `(:eval (let* ((minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
+                 (prompt (format " %s" (string-trim (minibuffer-prompt) nil "[: ]+")))
+                 (left (if (eq nano-vertico-prompt nil)
+                           ""
+                         prompt))
+                 (right minibuffer))
+            (concat
+             (propertize left 'face '(bold mode-line))
+             (propertize " "
+                         'display `(space :align-to (- right ,(length right) 1)))
+             (propertize right 'face '(font-lock-comment-face mode-line))))))
 
 (defun nano-vertico--setup ()
   "Setup nano vertico mode"
@@ -237,19 +249,8 @@ default face height is set to 0.1 to hide regular prompt/contents"
     ;; Hide mode-line
     (with-current-buffer (nth 1 (buffer-list))
       (setq mode-line-format nil)))
-  
-  (setq mode-line-format
-        `(:eval (let* ((minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
-                       (prompt (format " %s" (string-trim (minibuffer-prompt) nil "[: ]+")))
-                       (left (if (eq nano-vertico-prompt nil)
-                                 ""
-                               prompt))
-                       (right minibuffer))
-                  (concat
-                   (propertize left 'face '(bold mode-line))
-                   (propertize " "
-                               'display `(space :align-to (- right ,(length right) 1)))
-                   (propertize right 'face '(font-lock-comment-face mode-line))))))
+
+  (setq mode-line-format (nano-vertico--mode-line))
 
    ;; Install our exit function
   (add-hook 'minibuffer-exit-hook #'nano-vertico--exit)
