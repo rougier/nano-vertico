@@ -31,7 +31,8 @@
 ;;  experimental and may not be safe for daily use.
 ;;
 ;; Known problems:
-;; - FIXED. Messages are hidden when prompt is active
+;; - FIXED Messages are hidden when prompt is active
+;; - FIXED slow scroll (see https://github.com/minad/vertico/discussions/427)
 ;; - Opening two minibuffers in two different frames at the same time
 ;;   messes up depth detection.
 ;;
@@ -75,7 +76,8 @@
   :group 'nano-vertico)
 
 (defface nano-vertico-buffer-face
-  `((t :foreground ,(face-foreground 'default)))
+  `((t :foreground ,(face-foreground 'default)
+       :height 0.20))
   "Face for completions"
   :group 'nano-vertico)
 
@@ -116,6 +118,22 @@
       (concat (propertize content 'face '(nano-vertico-header-face bold))
               (propertize completion 'face 'font-lock-comment-face)))
     content))
+
+(defun nano-vertico--format-string (string)
+  "Return STRING with height property set to default height"
+  
+  (let ((height (face-attribute 'default ':height)))
+    (add-face-text-property  0 (length string) `(:height ,height) nil string)
+    string))
+
+(defun nano-vertico--format-candidate (orig-fun cand prefix suffix index start)
+  "Make sure CAND, PREFIX and SUFFIX have height set because the
+default face height is set to 0.1 to hide regular prompt/contents"
+
+  (apply orig-fun (list (nano-vertico--format-string cand)
+                        (nano-vertico--format-string (concat " " prefix))
+                        (nano-vertico--format-string suffix)
+                        index start)))
 
 (defun nano-vertico--update-header-line ()
   "This function do several things:
@@ -197,12 +215,14 @@
   (face-remap-set-base 'mode-line 'nano-vertico-mode-line-face)
   (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
   (face-remap-set-base 'region 'default)
+  (face-remap-set-base 'default 'nano-vertico-buffer-face)
   
   ;; Need to expand minibuffer by one line because of header padding (I think)
   (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
     (dolist (window windows)
       (unless (eq window (active-minibuffer-window))
-        (window-resize window 2))))
+        (set-window-margins window 0 0)
+        (window-resize window 1))))
   
   (setq-local cursor-type nil)
 
@@ -269,17 +289,22 @@ and delete it"
   
   ;; We save vertico settings before setting our own
   (setq nano-vertico--buffer-mode vertico-buffer-mode
+        nano-vertico--buffer-hide-prompt vertico-buffer-hide-prompt
         nano-vertico--buffer-display-action vertico-buffer-display-action)
   (setq vertico-buffer-display-action
         `(display-buffer-in-side-window
-          (window-height . ,(+ 5 vertico-count))
-          ;; (window-height . 12)
+          (window-height . ,(+ 3 vertico-count))
           (side . bottom)))
-
+  (setq vertico-buffer-hide-prompt nil)
+  
   ;; Install our setup after vertico setup
   (advice-add #'vertico--setup
               :after #'nano-vertico--setup)
 
+  ; Install our own candidate format to fix size
+  (advice-add #'vertico--format-candidate
+              :around #'nano-vertico--format-candidate)
+  
   ;; Install advice on minibuffer message
   (advice-add #'minibuffer-message
               :around #'nano-vertico--minibuffer-message)
@@ -293,6 +318,7 @@ and delete it"
   ;; Restore previous vertico settings
   (setq vertico-buffer-display-action nano-vertico--buffer-display-action)
   (vertico-buffer-mode (or nano-vertico--buffer-mode -1))
+  (setq vertico-buffer-hide-prompt nano-vertico--buffer-hide-prompt)
   
   ;; Remove our setup
   (advice-remove #'vertico--setup
@@ -302,6 +328,10 @@ and delete it"
   (advice-remove #'minibuffer-message
                  #'nano-vertico--minibuffer-message)
 
+  ;; Remove our formatting
+  (advice-remove #'vertico--format-candidate
+                 #'nano-vertico--format-candidate)
+  
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
 
