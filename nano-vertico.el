@@ -235,6 +235,7 @@ default face height is set to 0.1 to hide regular prompt/contents"
       (unless (eq window (active-minibuffer-window))
         (set-window-margins window 0 0)
         (set-window-fringes window 1 1)
+        (select-window window)
         (window-resize window 1))))
   
   (setq-local cursor-type nil)
@@ -248,8 +249,9 @@ default face height is set to 0.1 to hide regular prompt/contents"
                     mode-line-format))))
 
     ;; Hide mode-line
-    (with-current-buffer (nth 1 (buffer-list))
-      (setq mode-line-format nil)))
+    ;; (with-current-buffer (nth 1 (buffer-list))
+    ;;   (setq mode-line-format nil))
+    )
 
   (setq mode-line-format (nano-vertico--mode-line))
 
@@ -264,8 +266,8 @@ default face height is set to 0.1 to hide regular prompt/contents"
   "Remove hooks and restore mode-line"
 
   (unless (> (minibuffer-depth) 1)
-    (with-current-buffer (car nano-vertico--saved-state)
-      (setq mode-line-format (cdr nano-vertico--saved-state)))
+;;    (with-current-buffer (car nano-vertico--saved-state)
+;;      (setq mode-line-format (cdr nano-vertico--saved-state)))
     (remove-hook 'post-command-hook #'nano-vertico--update-header-line)))
 
 (defvar nano-vertico--current-message nil
