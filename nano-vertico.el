@@ -1,12 +1,10 @@
-;;; nano-minibuffer.el --- N Λ N O vertico -*- lexical-binding: t -*-
-
-;; Copyright (C) 2023 Nicolas P. Rougier
+;;; nano-vertico.el --- NANO appearance for vertico completion UI -*- lexical-binding: t; -*-
 
 ;; Maintainer: Nicolas P. Rougier <Nicolas.Rougier@inria.fr>
-;; URL: https://github.com/rougier/nano-modeline
-;; Version: 0.1
-;; Package-Requires: ((emacs "27.1") (vertico))
-;; Keywords: convenience, mode-line, header-line
+;; URL: https://github.com/rougier/nano-vertico
+;; Version: 1.0
+;; Package-Requires: ((emacs "27.1") (vertico "1.0"))
+;; Keywords: convenience, matching, tools
 
 ;; This file is not part of GNU Emacs.
 
@@ -23,370 +21,175 @@
 ;; For a full copy of the GNU General Public License
 ;; see <https://www.gnu.org/licenses/>.
 
-;;; Commentary
+;;; Commentary:
 ;;
-;;  nano-minibuffer takes advantage of vertico-buffer mode and displays
-;;  the minibuffer prompt and contents inside the header line while
-;;  completions are displayed in a regular buffer. It is highly
-;;  experimental and may not be safe for daily use.
+;; This package provides `nano-vertico-mode`, a global minor mode that
+;; reshapes the vertico minibuffer display to match the NANO
+;; aesthetic. Features include a pill-shaped depth indicator, a custom
+;; header showing the originating command, and an optional horizontal
+;; separator.
 ;;
-;; Known problems:
-;; - FIXED Messages are hidden when prompt is active
-;; - FIXED slow scroll (see https://github.com/minad/vertico/discussions/427)
-;; - Opening two minibuffers in two different frames at the same time
-;;   messes up depth detection.
-;;
+;; Default configuration required nerd font (www.nerdfonts.com). If
+;; not available, replace glyphs in 'nano-vertico-symbols'
 
-;;; NEWS:
-;;
-;; Version 0.1
-;; - First release
-;;
 ;;; Code:
 (require 'vertico)
-(require 'vertico-buffer)
 
-(defcustom nano-vertico-header-padding '(0.15 . 0.20)
-  "Top and bottom padding for the header line"
-  :type '(cons float float)
-  :group 'nano-vertico)
+(defgroup nano-vertico nil
+  "NANO-emacs aesthetic for Vertico."
+  :group 'vertico
+  :prefix "nano-vertico-")
 
-(defcustom nano-vertico-prompt t
-  "Prompt replacement that can be nil (regular prompt), t (minibuffer
- depth) or an arbitrary prompt string"
-  :type '(choice (const :tag "Regular prompt" nil)
-                 (const :tag "Minibuffer counter" t)
-                 (string :tag "User defined"))
-  :group 'nano-vertico)
+(defcustom nano-vertico-symbols '((pill-left  . "")
+                                  (pill-right . "")
+                                  (selection  . "")
+                                  (line       . ?╴))
+  "Various symbols used to decorate minibuffer.")
 
-(defface nano-vertico-header-face
-  `((t :foreground ,(face-foreground 'default)
-       :background ,(face-background 'nano-subtle)
-       :height ,(face-attribute 'default :height)
-;;       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
-       ))
-  "Face for header line"
-  :group 'nano-vertico)
+(defcustom nano-vertico-pill-format " %s "
+  "Pill format string")
 
-(defface nano-vertico-mode-line-face
-  `((t :foreground ,(face-foreground 'default)
-       :height ,(face-attribute 'default :height)
-       :box nil
-       :overline ,(face-foreground 'default nil t)))
-  "Face for mode line"
-  :group 'nano-vertico)
+(defcustom nano-vertico-gutter-format " %s "
+  "Gutter format string")
 
-(defface nano-vertico-buffer-face
-  `((t :foreground ,(face-foreground 'default)
-       :height 0.25))
-  "Face for completions"
-  :group 'nano-vertico)
+(defcustom nano-vertico-lines '(nil . t)
+  "Whether to add top and bottom line around prompt")
 
-(defface nano-vertico-prompt-face
-  `((t ;; :foreground ,(face-foreground 'default)
-       ;; :background ,(face-background 'default)
-;;       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
-       :inherit (nano-salient-i nano-strong)))
-  "Face for prompt"
-  :group 'nano-vertico)
+(defvar-local nano-vertico--origin-command nil
+  "Internal variable to store the command that triggered the minibuffer.")
 
-(defface nano-vertico-region-face
-  `((t :foreground ,(face-foreground 'region nil 'default)
-       :background ,(face-background 'region nil 'default)
-       :inherit bold))
-  "Face for active region"
-    :group 'nano-vertico)
-
-(defface nano-vertico-annotation-face
-  `((t :foreground ,(face-foreground font-lock-comment-face nil t)
-       ;; :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
-       ))
-  "Face for help message"
-    :group 'nano-vertico)
-
-(defface nano-vertico-cursor-face
-  `((t :foreground ,(face-background 'default)
-       :background ,(face-foreground 'default)
-       :inherit header-line))
-  "Face for cursor"
-  :group 'nano-vertico)
-
-(defun nano-vertico--format-content (content completion)
-  "Complete CONTENT with COMPLETION"
-
-  ;; Some completion get a non displayable at the end for unknown reason
-  ;; This tries to remove it
-
-  (let* ((displayable (or (= (length completion) 0)
-                          (char-displayable-p (aref completion (1- (length completion))))))
-         (completion (if displayable
-                         completion
-                       (substring completion 0 -1))))
-    (if (eq (string-match content completion) 0)
-        (let ((completion (substring-no-properties completion
-                                                   (length content) (length completion))))
-          (concat (propertize content 'face '(nano-vertico-header-face bold))
-                  (propertize completion 'face 'font-lock-comment-face)))
-      content)))
-
-(defun nano-vertico--format-string (string &optional face)
-  "Return STRING with height property set to default height"
-
-  (when (stringp string)
-    (let ((face (or face 'default))
-          (height (face-attribute 'default ':height)))
-;;      (add-face-text-property 0 (length string) `(:inherit ,face) t string)
-;;      (add-face-text-property 0 (length string) `(:height ,height) nil string)
-;;      string)))
-(propertize string 'face `(:inherit ,face :height ,height)))))
-
-
-(defun nano-vertico--format-candidate (orig-fun cand prefix suffix index start)
-  "Make sure CAND, PREFIX and SUFFIX have height set because the
-default face height is set to 0.1 to hide regular prompt/contents"
-
-  (let* ((cand (nano-vertico--format-string cand))
-         (prefix (nano-vertico--format-string
-                   (cond (vertico-grid-mode " ")
-                         ((eq vertico--index index) "󰅂 ")
-                         (t "  "))))
-         (suffix (nano-vertico--format-string suffix
-                                              'nano-vertico-annotation-face)))
-  (apply orig-fun (list (concat prefix cand) "" suffix index start))))
-
-(defun nano-vertico--update-header-line ()
-  "This function do several things:
-1. Copy the minibuffer prompt and contents to header line
-2. Emulate cursor inside the header line
-3. Emulate region highlight when needed
-4. Hide the actual minibuffer prompt and contents
-    (setting foreground color to background color)"
-
-  (let ((active (eq (window-buffer (minibuffer-window)) (current-buffer))))
-    (with-current-buffer (window-buffer (minibuffer-window))
-      (let* ((actual-prompt (substring-no-properties (minibuffer-prompt)))
-             (contents (substring-no-properties (minibuffer-contents)))
-             (actual-prompt-length (+ 2 (length actual-prompt)))
-             (header-prompt (if (and (stringp actual-prompt) (> (length actual-prompt) 0))
-                                (cond ((eq nano-vertico-prompt t) (format "#%d" (minibuffer-depth)))
-                                      ((stringp nano-vertico-prompt) nano-vertico-prompt)
-                                      (t (string-trim prompt nil "[: ]+")))
-                              " "))
-             (items (or nano-vertico--current-message
-                        (format "%d items" vertico--total)))
-             (candidate (or (vertico--candidate) ""))
-             (contents (nano-vertico--format-content contents candidate))
-             (point (1+ (point)))
-             (top (car nano-vertico-header-padding))
-             (bottom (cdr nano-vertico-header-padding))
-             (header-prompt (concat
-                             (propertize " " 'display `(raise ,top))
-                             header-prompt
-                             (propertize " " 'display `(raise ,(- bottom)))))
-             (header-prompt-length (+ 2 (length header-prompt)))
-             (header-prompt (concat (propertize header-prompt 'face 'nano-vertico-prompt-face) " "))
-             (contents (concat contents
-                               " "
-                               (propertize " " 'display `(space :align-to (- right ,(length items) 1)))
-                               (propertize items 'face 'nano-vertico-annotation-face)))
-
-             ;; Necessary for minibuffer box
-             ;; (contents (concat contents
-             ;;                   (propertize " " 'display `(space :align-to right-fringe))
-             ;;                   (propertize " " 'display '(space :width (1)) 'face 'nano-default-i)))
-             ;; (header-prompt (concat (propertize " " 'display '(space :width (1)) 'face 'nano-default-i)
-             ;;                        header-prompt))
-
-             )
-
-    ;; Hide regular prompt & contents
-    (unless (or cursor-type (not header-line-format))
-      (let ((inhibit-read-only t)
-            (deactivate-mark nil))
-         (add-text-properties (point-min)
-                              (line-end-position)
-                              `(face (:foreground ,(face-background 'default))))))
-
-    ;; Set cursor & region
-    (let ((cursor-pos (max 0 (- point actual-prompt-length)))
-          (region (when (use-region-p)
-                    (cons (- (region-beginning) -1 actual-prompt-length)
-                          (- (region-end) actual-prompt-length -1))))
-          (space 2)
-          (end-of-line (= (point) (line-end-position))))
-
-      ;; Set region
-      (when region
-        (add-face-text-property (car region) (cdr region)
-                                'nano-vertico-region-face nil contents))
-      ;; Set cursor
-      (when active
-        (add-face-text-property cursor-pos (1+ cursor-pos)
-                                'nano-vertico-cursor-face nil contents))
-
-      ;; Make sure cursor is always visible
-      (when (> cursor-pos (- (window-width) header-prompt-length space))
-        (setq contents
-              (concat "…" (substring contents (- cursor-pos (- (window-width) header-prompt-length 2 space))))))
-      (when (> (length contents) (- (window-width) header-prompt-length (- space 1)))
-        (setq contents
-              (concat (substring contents 0 (- (window-width) header-prompt-length space))
-                      (if (not end-of-line) "…")))))
-
-    (setq-local header-line-format (concat header-prompt contents))))))
-
-(defun nano-vertico--mode-line ()
-  `(:eval (let* ((minibuffer (format " Minibuffer #%d" (minibuffer-depth)))
-                 (prompt (format " %s" (string-trim (minibuffer-prompt) nil "[: ]+")))
-                 (left (if (eq nano-vertico-prompt nil)
-                           ""
-                         prompt))
-                 (right minibuffer))
-            (concat
-             (propertize left 'face '(bold mode-line))
-             (propertize " "
-                         'display `(space :align-to (- right ,(length right) 1)))
-             (propertize right 'face '(font-lock-comment-face mode-line))))))
-
-(defun nano-vertico--setup ()
-  "Setup nano vertico mode"
-
-  (setq vertico-count 9)
-
-  (face-remap-set-base 'mode-line 'nano-vertico-mode-line-face)
-  (face-remap-set-base 'mode-line-active 'nano-vertico-mode-line-face)
-  (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
-  (face-remap-set-base 'region 'default)
-  ;; (face-remap-set-base 'header-line 'nano-vertico-header-face)
-  (face-remap-set-base 'header-line `( :inherit nano-vertico-header-face
-;;                                        :overline ,(face-foreground 'default)
-                                       ))
-;;   (face-remap-set-base 'fringe `(:background ,(face-foreground 'default)))
-  (face-remap-set-base 'default 'nano-vertico-buffer-face)
-
-  ;; Need to expand minibuffer by one line because of header padding (I think)
-  (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
-    (dolist (window windows)
-      (unless (eq window (active-minibuffer-window))
-        (set-window-margins window 0 0)
-        (set-window-fringes window 1 1)
-        (select-window window)
-        (when (< (window-height) (+ vertico-count 3))
-          (window-resize window 1))
-        )))
-
-  (setq-local cursor-type nil)
-
-  (when (eq (minibuffer-depth) 1)
-    ;; We save mode line format since we hide it when minibuffer is displayed
-    (setq nano-vertico--saved-state
-          (let ((buffer (nth 1 (buffer-list))))
-            (cons buffer
-                  (with-current-buffer buffer
-                    mode-line-format))))
-
-    ;; Hide mode-line
-    ;; (with-current-buffer (nth 1 (buffer-list))
-    ;;   (setq mode-line-format nil))
-    )
-
-  ;; (setq tab-line-format "")
-  (setq mode-line-format (nano-vertico--mode-line))
-
-   ;; Install our exit function
-  (add-hook 'minibuffer-exit-hook #'nano-vertico--exit)
-
-  ;; Install our copy function
-  (add-hook 'post-command-hook #'nano-vertico--update-header-line))
-
-
-(defun nano-vertico--exit ()
-  "Remove hooks and restore mode-line"
-
-  (unless (> (minibuffer-depth) 1)
-;;    (with-current-buffer (car nano-vertico--saved-state)
-;;      (setq mode-line-format (cdr nano-vertico--saved-state)))
-    (remove-hook 'post-command-hook #'nano-vertico--update-header-line)))
-
-(defvar nano-vertico--current-message nil
-  "Current minibuffer message")
-
-(defun nano-vertico--minibuffer-message (orig-fun message &rest args)
-  "Copy message to nano-vertico--current-message, wait for timeout
-and delete it"
-
-  (if (active-minibuffer-window)
-      (progn
-        (setq nano-vertico--current-message (apply #'format-message message args))
-        (nano-vertico--update-header-line)
-        (let ((inhibit-message t))
-          (message message args))
-        (sit-for (or minibuffer-message-timeout 1000000))
-        (setq nano-vertico--current-message nil)
-        (nano-vertico--update-header-line))
-    (apply orig-fun message args)))
-
-(defun nano-vertico-mode-on ()
-  "Activate nano-vertico-mode"
-
-  ;; We save vertico settings before setting our own
-  (setq nano-vertico--buffer-mode vertico-buffer-mode
-        nano-vertico--buffer-hide-prompt vertico-buffer-hide-prompt
-        nano-vertico--buffer-display-action vertico-buffer-display-action)
-  (setq vertico-buffer-display-action
-        `(display-buffer-in-side-window
-          (window-height . ,(+ 3 vertico-count))
-          (side . bottom)))
-  (setq vertico-buffer-hide-prompt t)
-
-  ;; Install our setup after vertico setup
-  (advice-add #'vertico--setup
-              :after #'nano-vertico--setup)
-
-  ; Install our own candidate format to fix size
-  (advice-add #'vertico--format-candidate
-              :around #'nano-vertico--format-candidate)
-
-  ;; Install advice on minibuffer message
-  (advice-add #'minibuffer-message
-              :around #'nano-vertico--minibuffer-message)
-
-  ;; Starts vertico buffer mode
-  (vertico-buffer-mode 1))
-
-(defun nano-vertico-mode-off ()
-  "Deactivate nano-vertico-mode"
-
-  ;; Restore previous vertico settings
-  (setq vertico-buffer-display-action nano-vertico--buffer-display-action)
-  (vertico-buffer-mode (or nano-vertico--buffer-mode -1))
-  (setq vertico-buffer-hide-prompt nano-vertico--buffer-hide-prompt)
-
-  ;; Remove our setup
-  (advice-remove #'vertico--setup
-                 #'nano-vertico--setup)
-
-  ;; Remove our advice on minibuffer message
-  (advice-remove #'minibuffer-message
-                 #'nano-vertico--minibuffer-message)
-
-  ;; Remove our formatting
-  (advice-remove #'vertico--format-candidate
-                 #'nano-vertico--format-candidate)
-
-  ;; Remove exit hook
-  (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
+(defun nano-vertico--capture-command ()
+  "Store the value of `this-command` at the moment the minibuffer is setup."
+  (setq-local nano-vertico--origin-command this-command))
 
 ;;;###autoload
 (define-minor-mode nano-vertico-mode
-  "Nano vertico mode takes advantage of the vertico buffer mode to
-show the minibuffer prompt and contents inside the header line of
-a dedicated window"
-  :lighter "[•]"
-
+  "Toggle NANO-style appearance for Vertico.
+When enabled, it overrides Vertico's candidate formatting and display 
+functions to provide a clean, header-based UI."
+  :global t
+  :group 'nano-vertico
   (if nano-vertico-mode
-      (nano-vertico-mode-on)
-    (nano-vertico-mode-off)))
+      (progn
+        (setq max-mini-window-height (+ vertico-count 3))
+        (advice-add #'vertico--format-candidate :override #'nano-vertico--format-candidate)
+        (advice-add #'vertico--display-candidates :override #'nano-vertico-display-candidates)
+        (add-hook 'minibuffer-setup-hook #'nano-vertico--capture-command))
+    (advice-remove #'vertico--format-candidate #'nano-vertico--format-candidate)
+    (advice-remove #'vertico--display-candidates #'nano-vertico-display-candidates)
+    (remove-hook 'minibuffer-setup-hook #'nano-vertico--capture-command)))
+
+(defun nano-vertico--format-candidate (cand prefix suffix index _start)
+  "Format CAND with a selection indicator padding."
+  (setq cand (vertico--display-string (concat prefix cand suffix "\n")))
+  (when (= index vertico--index)
+    (add-face-text-property 0 (length cand) 'vertico-current 'append cand))
+  (concat (propertize (format nano-vertico-gutter-format 
+                              (if (= index vertico--index)
+                                  nano-vertico-chevron-symbol
+                                (alist-get 'selection nano-vertico-symbols)
+                                " "))
+                      'face (if (= index vertico--index)
+                                'widget-field
+                              'highlight))
+          (propertize " " 'face 'default)
+          cand))
+
+(defun nano-vertico-display-candidates (lines)
+  "Render the full minibuffer UI with the NANO-emacs header style."
+  (let* ((inhibit-read-only t)
+         (no-selection (or (not (numberp vertico--index))
+                           (< vertico--index 0)))
+         (prompt (minibuffer-prompt))
+         (prompt (string-trim-right prompt "[: ]+"))
+         (vertico-count-format '("%s" . "%s/%s"))
+         (count (format "%s" (vertico--format-count)))
+         (info (format " (%s)" (or nano-vertico--origin-command "Unknown")))
+
+         ;; Restored original NANO face logic
+         (face-prompt `(:foreground ,(face-background 'default nil 'default)
+                        :background ,(face-foreground 'default nil 'default)
+                        :weight ,(face-attribute 'bold :weight nil 'default)))
+         (face-prompt-l `(:foreground ,(face-foreground 'default nil 'default)
+                          :background ,(face-background 'default nil 'default)
+                          :weight ,(face-attribute 'bold :weight nil 'default)))
+         (face-prompt-r `(:foreground ,(face-foreground 'default nil 'default)
+                          :background ,(face-background 'widget-field nil 'default)
+                          :weight ,(face-attribute 'bold :weight nil 'default)))
+         (face-header-bold `(:foreground ,(face-foreground 'default nil 'default)
+                             :background ,(face-background 'widget-field nil 'default)
+                             :weight ,(face-attribute 'bold :weight nil 'default)))
+         (face-header-shadow `(:foreground ,(face-foreground 'shadow nil 'default)
+                               :background ,(face-background 'widget-field nil 'default)
+                               :weight ,(face-attribute 'default :weight nil 'default)))
+         (face-header `(:foreground ,(face-foreground 'default nil 'default)
+                        :background ,(face-background 'widget-field nil 'default)
+                        :weight ,(face-attribute 'default :weight nil 'default)))
+         (face-entry `(:foreground ,(face-foreground 'default nil 'default)
+                        :background ,(face-background 'highlight nil 'default)))
+         (face-entry-bold `(:foreground ,(face-foreground 'default nil 'default)
+                            :background ,(face-background 'highlight nil 'default)
+                            :weight ,(face-attribute 'bold :weight nil 'default)))
+         (face-entry-shadow `(:foreground ,(face-foreground 'shadow nil 'default)
+                              :background ,(face-background 'highlight nil 'default)))
+
+         (pill (concat (propertize (alist-get 'pill-left nano-vertico-symbols)
+                                   'face face-prompt-l)
+                       (propertize (format nano-vertico-pill-format (minibuffer-depth))
+                                   'face face-prompt)
+                       (propertize (alist-get 'pill-right nano-vertico-symbols)
+                                   'face face-prompt-r)))
+         (prompt-align (propertize " " 'display `(space :align-to (- right 1))))
+         (header-align (make-string (max 0 (- (window-width)
+                                              (length pill)
+                                              (length prompt)
+                                              (length info)
+                                              (length count) 2)) ?\s))
+         (h-line (concat
+                  (propertize (make-string (window-width) 
+                                           (alist-get 'line nano-vertico-symbols))
+                              'face 'default)
+                  (propertize "\n" 'face 'default)))                 
+         (new-prompt (concat
+                      (if (car nano-vertico-lines) h-line "")
+                      pill
+                      (propertize " " 'face face-header)
+                      (propertize prompt 'face face-header-bold)
+                      (propertize info 'face face-header)
+                      (propertize header-align 'face face-header)
+                      (propertize count 'face face-header-shadow)
+                      (propertize "\n"  'face face-header-shadow)
+                      (if no-selection
+                           (propertize (format nano-vertico-gutter-format
+                                               nano-vertico-chevron-symbol)
+                                       'face 'vertico-current)
+                         (propertize (format nano-vertico-gutter-format "?")
+                                     'face face-entry-shadow)))))
+
+    ;; HACK: Modifying buffer display table to have full width line
+    (when (or (car nano-vertico-lines) (cdr nano-vertico-lines))
+      (unless buffer-display-table
+        (setq buffer-display-table (make-display-table)))
+      (set-display-table-slot buffer-display-table 'wrap
+                              (make-glyph-code (alist-get 'line nano-vertico-symbols)))
+      (set-display-table-slot buffer-display-table 'truncation
+                              (make-glyph-code (alist-get 'line nano-vertico-symbols)))
+      (setq truncate-lines t))
+    (add-text-properties (point-min) (length (minibuffer-prompt)) `(display ,new-prompt))
+    
+    (if no-selection
+        (add-text-properties (point-min) (point-max) `(face ,face-entry-bold))
+      (add-text-properties (point-min) (point-max) `(face ,face-entry-shadow)))
+    
+    (move-overlay vertico--candidates-ov (point-max) (point-max))
+    (overlay-put vertico--candidates-ov 'after-string
+                 (concat
+                  (propertize " " 'cursor t 'face `(:inherit ,face-entry :extend t))
+                  (apply #'concat
+                         (propertize prompt-align 'face face-entry)
+                         (propertize "\n" 'face face-entry)
+                         (if (cdr nano-vertico-lines) h-line "")     
+                         (if (eq (length lines) 0) (list " ") lines))))))
 
 (provide 'nano-vertico)
 ;;; nano-vertico.el ends here

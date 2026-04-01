@@ -1,14 +1,20 @@
-* N Λ N O vertico
+* NANO vertico
 
-nano-vertico takes advantage of [[https://github.com/minad/vertico][vertico]] buffer mode to display the minibuffer prompt and contents inside the header line while completions are displayed in a regular buffer. Prompt can be changed and displayed in the modeline.
+This package provides `nano-vertico-mode`, a global minor mode that
+reshapes the vertico minibuffer display to match the NANO
+aesthetic. Features include a pill-shaped depth indicator, a custom
+header showing the originating command, and an optional horizontal
+separator.
 
-*Note*: nano-vertico is highly experimental and may not be safe for daily use
+*Note:* default configuration required nerd font (www.nerdfonts.com). If
+not available, replace glyphs in 'nano-vertico-symbols'
+
 
 ** Usage
 
 #+begin_src emacs-lisp
 (require 'nano-vertico)
-(nano-vertico-mode 1)
+(nano-vertico-mode)
 #+end_src
 
 ** Screenshot
