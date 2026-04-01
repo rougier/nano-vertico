@@ -65,7 +65,7 @@
 ;;;###autoload
 (define-minor-mode nano-vertico-mode
   "Toggle NANO-style appearance for Vertico.
-When enabled, it overrides Vertico's candidate formatting and display 
+When enabled, it overrides vertico's candidate formatting and display 
 functions to provide a clean, header-based UI."
   :global t
   :group 'nano-vertico
@@ -86,7 +86,6 @@ functions to provide a clean, header-based UI."
     (add-face-text-property 0 (length cand) 'vertico-current 'append cand))
   (concat (propertize (format nano-vertico-gutter-format 
                               (if (= index vertico--index)
-                                  nano-vertico-chevron-symbol
                                 (alist-get 'selection nano-vertico-symbols)
                                 " "))
                       'face (if (= index vertico--index)
@@ -160,8 +159,8 @@ functions to provide a clean, header-based UI."
                       (propertize count 'face face-header-shadow)
                       (propertize "\n"  'face face-header-shadow)
                       (if no-selection
-                           (propertize (format nano-vertico-gutter-format
-                                               nano-vertico-chevron-symbol)
+                          (propertize (format nano-vertico-gutter-format
+                                              (alist-get 'selection nano-vertico-symbols))
                                        'face 'vertico-current)
                          (propertize (format nano-vertico-gutter-format "?")
                                      'face face-entry-shadow)))))
