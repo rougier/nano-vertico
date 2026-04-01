@@ -46,7 +46,7 @@
 (require 'vertico)
 (require 'vertico-buffer)
 
-(defcustom nano-vertico-header-padding '(0.20 . 0.25)
+(defcustom nano-vertico-header-padding '(0.15 . 0.20)
   "Top and bottom padding for the header line"
   :type '(cons float float)
   :group 'nano-vertico)
@@ -61,9 +61,10 @@
 
 (defface nano-vertico-header-face
   `((t :foreground ,(face-foreground 'default)
-       :background ,(face-background 'default)
+       :background ,(face-background 'nano-subtle)
        :height ,(face-attribute 'default :height)
-       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)))
+;;       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
+       ))
   "Face for header line"
   :group 'nano-vertico)
 
@@ -71,20 +72,21 @@
   `((t :foreground ,(face-foreground 'default)
        :height ,(face-attribute 'default :height)
        :box nil
-       :overline ,(face-foreground 'font-lock-comment-face nil t)))
+       :overline ,(face-foreground 'default nil t)))
   "Face for mode line"
   :group 'nano-vertico)
 
 (defface nano-vertico-buffer-face
   `((t :foreground ,(face-foreground 'default)
-       :height 0.20))
+       :height 0.25))
   "Face for completions"
   :group 'nano-vertico)
 
 (defface nano-vertico-prompt-face
-  `((t :foreground ,(face-background 'default)
-       :background ,(face-foreground 'default)       
-       :inherit bold))
+  `((t ;; :foreground ,(face-foreground 'default)
+       ;; :background ,(face-background 'default)
+;;       :box (:line-width 1 :color ,(face-foreground 'default) :style nil)
+       :inherit (nano-salient-i nano-strong)))
   "Face for prompt"
   :group 'nano-vertico)
 
@@ -111,29 +113,46 @@
 
 (defun nano-vertico--format-content (content completion)
   "Complete CONTENT with COMPLETION"
-  
-  (if (eq (string-match content completion) 0)
-    (let ((completion (substring-no-properties completion
-                       (length content) (length completion))))
-      (concat (propertize content 'face '(nano-vertico-header-face bold))
-              (propertize completion 'face 'font-lock-comment-face)))
-    content))
 
-(defun nano-vertico--format-string (string)
+  ;; Some completion get a non displayable at the end for unknown reason
+  ;; This tries to remove it
+
+  (let* ((displayable (or (= (length completion) 0)
+                          (char-displayable-p (aref completion (1- (length completion))))))
+         (completion (if displayable
+                         completion
+                       (substring completion 0 -1))))
+    (if (eq (string-match content completion) 0)
+        (let ((completion (substring-no-properties completion
+                                                   (length content) (length completion))))
+          (concat (propertize content 'face '(nano-vertico-header-face bold))
+                  (propertize completion 'face 'font-lock-comment-face)))
+      content)))
+
+(defun nano-vertico--format-string (string &optional face)
   "Return STRING with height property set to default height"
-  
-  (let ((height (face-attribute 'default ':height)))
-    (add-face-text-property  0 (length string) `(:height ,height) nil string)
-    string))
+
+  (when (stringp string)
+    (let ((face (or face 'default))
+          (height (face-attribute 'default ':height)))
+;;      (add-face-text-property 0 (length string) `(:inherit ,face) t string)
+;;      (add-face-text-property 0 (length string) `(:height ,height) nil string)
+;;      string)))
+(propertize string 'face `(:inherit ,face :height ,height)))))
+
 
 (defun nano-vertico--format-candidate (orig-fun cand prefix suffix index start)
   "Make sure CAND, PREFIX and SUFFIX have height set because the
 default face height is set to 0.1 to hide regular prompt/contents"
 
-  (apply orig-fun (list (nano-vertico--format-string cand)
-                        (nano-vertico--format-string (concat " " prefix))
-                        (nano-vertico--format-string suffix)
-                        index start)))
+  (let* ((cand (nano-vertico--format-string cand))
+         (prefix (nano-vertico--format-string
+                   (cond (vertico-grid-mode " ")
+                         ((eq vertico--index index) "󰅂 ")
+                         (t "  "))))
+         (suffix (nano-vertico--format-string suffix
+                                              'nano-vertico-annotation-face)))
+  (apply orig-fun (list (concat prefix cand) "" suffix index start))))
 
 (defun nano-vertico--update-header-line ()
   "This function do several things:
@@ -169,9 +188,18 @@ default face height is set to 0.1 to hide regular prompt/contents"
              (contents (concat contents
                                " "
                                (propertize " " 'display `(space :align-to (- right ,(length items) 1)))
-                               (propertize items 'face 'nano-vertico-annotation-face))))
+                               (propertize items 'face 'nano-vertico-annotation-face)))
 
-    ;; Hide regular prompt & contents 
+             ;; Necessary for minibuffer box
+             ;; (contents (concat contents
+             ;;                   (propertize " " 'display `(space :align-to right-fringe))
+             ;;                   (propertize " " 'display '(space :width (1)) 'face 'nano-default-i)))
+             ;; (header-prompt (concat (propertize " " 'display '(space :width (1)) 'face 'nano-default-i)
+             ;;                        header-prompt))
+
+             )
+
+    ;; Hide regular prompt & contents
     (unless (or cursor-type (not header-line-format))
       (let ((inhibit-read-only t)
             (deactivate-mark nil))
@@ -188,7 +216,7 @@ default face height is set to 0.1 to hide regular prompt/contents"
           (end-of-line (= (point) (line-end-position))))
 
       ;; Set region
-      (when region 
+      (when region
         (add-face-text-property (car region) (cdr region)
                                 'nano-vertico-region-face nil contents))
       ;; Set cursor
@@ -204,7 +232,7 @@ default face height is set to 0.1 to hide regular prompt/contents"
         (setq contents
               (concat (substring contents 0 (- (window-width) header-prompt-length space))
                       (if (not end-of-line) "…")))))
-    
+
     (setq-local header-line-format (concat header-prompt contents))))))
 
 (defun nano-vertico--mode-line ()
@@ -223,12 +251,19 @@ default face height is set to 0.1 to hide regular prompt/contents"
 (defun nano-vertico--setup ()
   "Setup nano vertico mode"
 
-  (face-remap-set-base 'header-line 'nano-vertico-header-face)
+  (setq vertico-count 9)
+
   (face-remap-set-base 'mode-line 'nano-vertico-mode-line-face)
+  (face-remap-set-base 'mode-line-active 'nano-vertico-mode-line-face)
   (face-remap-set-base 'mode-line-inactive 'nano-vertico-mode-line-face)
   (face-remap-set-base 'region 'default)
+  ;; (face-remap-set-base 'header-line 'nano-vertico-header-face)
+  (face-remap-set-base 'header-line `( :inherit nano-vertico-header-face
+;;                                        :overline ,(face-foreground 'default)
+                                       ))
+;;   (face-remap-set-base 'fringe `(:background ,(face-foreground 'default)))
   (face-remap-set-base 'default 'nano-vertico-buffer-face)
-  
+
   ;; Need to expand minibuffer by one line because of header padding (I think)
   (let ((windows (get-buffer-window-list (window-buffer (minibuffer-window)))))
     (dolist (window windows)
@@ -236,15 +271,17 @@ default face height is set to 0.1 to hide regular prompt/contents"
         (set-window-margins window 0 0)
         (set-window-fringes window 1 1)
         (select-window window)
-        (window-resize window 1))))
-  
+        (when (< (window-height) (+ vertico-count 3))
+          (window-resize window 1))
+        )))
+
   (setq-local cursor-type nil)
 
   (when (eq (minibuffer-depth) 1)
     ;; We save mode line format since we hide it when minibuffer is displayed
     (setq nano-vertico--saved-state
           (let ((buffer (nth 1 (buffer-list))))
-            (cons buffer 
+            (cons buffer
                   (with-current-buffer buffer
                     mode-line-format))))
 
@@ -253,6 +290,7 @@ default face height is set to 0.1 to hide regular prompt/contents"
     ;;   (setq mode-line-format nil))
     )
 
+  ;; (setq tab-line-format "")
   (setq mode-line-format (nano-vertico--mode-line))
 
    ;; Install our exit function
@@ -290,7 +328,7 @@ and delete it"
 
 (defun nano-vertico-mode-on ()
   "Activate nano-vertico-mode"
-  
+
   ;; We save vertico settings before setting our own
   (setq nano-vertico--buffer-mode vertico-buffer-mode
         nano-vertico--buffer-hide-prompt vertico-buffer-hide-prompt
@@ -300,7 +338,7 @@ and delete it"
           (window-height . ,(+ 3 vertico-count))
           (side . bottom)))
   (setq vertico-buffer-hide-prompt t)
-  
+
   ;; Install our setup after vertico setup
   (advice-add #'vertico--setup
               :after #'nano-vertico--setup)
@@ -308,11 +346,11 @@ and delete it"
   ; Install our own candidate format to fix size
   (advice-add #'vertico--format-candidate
               :around #'nano-vertico--format-candidate)
-  
+
   ;; Install advice on minibuffer message
   (advice-add #'minibuffer-message
               :around #'nano-vertico--minibuffer-message)
-  
+
   ;; Starts vertico buffer mode
   (vertico-buffer-mode 1))
 
@@ -323,7 +361,7 @@ and delete it"
   (setq vertico-buffer-display-action nano-vertico--buffer-display-action)
   (vertico-buffer-mode (or nano-vertico--buffer-mode -1))
   (setq vertico-buffer-hide-prompt nano-vertico--buffer-hide-prompt)
-  
+
   ;; Remove our setup
   (advice-remove #'vertico--setup
                  #'nano-vertico--setup)
@@ -335,7 +373,7 @@ and delete it"
   ;; Remove our formatting
   (advice-remove #'vertico--format-candidate
                  #'nano-vertico--format-candidate)
-  
+
   ;; Remove exit hook
   (remove-hook 'minibuffer-exit-hook #'nano--vertico-exit))
 
